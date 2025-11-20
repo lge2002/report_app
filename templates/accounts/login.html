@@ -273,7 +273,10 @@
     <div class="flex items-start justify-center w-full lg:w-2/6 h-screen px-6 py-8">
       <div id="login-card-container" class="w-full max-w-md login-card-initial login-card-animated">
 
-        <div id="state-title" class="mb-4 text-sm font-semibold">TamilNadu Data</div>
+        <div id="state-title" class="mb-4 text-sm font-semibold">
+  {{ selected_state|default:"TamilNadu" }} Data
+</div>
+
 
         <!-- NOTE: keep Tailwind's rounded-2xl on this element so border-radius is applied here -->
         <div class="shadow-xl rounded-2xl p-8 border border-gray-200 relative overflow-hidden login-card">
@@ -381,7 +384,54 @@
   <!-- LEAFLET JS -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
-  <!-- ⭐ MAP SCRIPT (UNCHANGED, DO NOT TOUCH) -->
+  <!-- ------------ CSRF helper + postSelectedState (AJAX) ------------ -->
+  <script>
+    // CSRF helper (reads cookie)
+    function getCookie(name) {
+      let v = null;
+      if (document.cookie) {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+          const c = cookies[i].trim();
+          if (c.startsWith(name + '=')) {
+            v = decodeURIComponent(c.substring(name.length + 1));
+            break;
+          }
+        }
+      }
+      return v;
+    }
+    const csrftoken = getCookie('csrftoken');
+
+    // Save selected state to session via AJAX and update UI immediately
+    function postSelectedState(name) {
+      const stateTitleEl = document.getElementById('state-title');
+      if (stateTitleEl) stateTitleEl.textContent = `${name} Data`;
+
+      fetch("{% url 'select_state' %}", {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+          'X-CSRFToken': csrftoken,
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: new URLSearchParams({ state: name })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (!data || !data.ok) {
+          console.warn('Failed saving state', data);
+        } else {
+          console.log('Selected state saved:', data.state);
+        }
+      })
+      .catch(err => {
+        console.error('Error saving selected state', err);
+      });
+    }
+  </script>
+
+  <!-- ⭐ MAP SCRIPT (UPDATED click handler to store state via AJAX; no navigation) -->
   <script>
     (function () {
 
@@ -473,11 +523,13 @@
           mouseout: resetHighlight,
           mousemove: moveTooltip,
 
+          // UPDATED: when user clicks a state, save it to session (AJAX) and stay on login page
           click: () => {
             const props = feature.properties || {};
             const name = props.NAME_1 || props.NAME || props.st_nm || 'State';
 
-            stateTitleEl.textContent = `${name} Data`;
+            // update the small title instantly (UX) and save to session via AJAX (no navigation)
+            postSelectedState(name);
           }
         });
       }

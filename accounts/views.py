@@ -1,21 +1,47 @@
 # accounts/views.py
+import json
+import os
+from django.conf import settings
 from django.shortcuts import render, redirect
+from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
+from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout, get_user_model
 from django.contrib.auth.decorators import login_required
-from django.views.decorators.http import require_POST
-from django.contrib import messages
+from django.views.decorators.http import require_POST, require_GET
 from django.contrib.auth.forms import AuthenticationForm
-from .forms import SignUpForm  # keep your SignUpForm in accounts/forms.py
-from django.utils.http import url_has_allowed_host_and_scheme
-from django.conf import settings
+from django.contrib.auth.views import LoginView
+from .forms import SignUpForm
 
 User = get_user_model()
+SESSION_STATE_KEY = 'selected_state'
 
+def _sanitize_state_name(raw: str):
+    if not raw:
+        return None
+    return " ".join(raw.strip().split())
+
+def _load_allowed_states():
+    """Try to read allowed state names from static/data/india.geojson.
+       Return a set of names (may be empty)."""
+    geojson_path = os.path.join(settings.BASE_DIR, 'static', 'data', 'india.geojson')
+    try:
+        with open(geojson_path, 'r', encoding='utf8') as fh:
+            data = json.load(fh)
+        names = set()
+        for feat in data.get('features', []):
+            props = feat.get('properties', {}) or {}
+            # common property names used in different geojsons
+            name = props.get('NAME_1') or props.get('NAME') or props.get('st_nm') or props.get('state')
+            if name:
+                names.add(name.strip())
+        return names
+    except Exception:
+        return set()
+
+ALLOWED_STATES = _load_allowed_states()
 
 def signup_view(request):
-    """
-    Simple signup view that uses your SignUpForm.
-    """
     if request.method == 'POST':
         form = SignUpForm(request.POST)
         if form.is_valid():
@@ -26,10 +52,10 @@ def signup_view(request):
         form = SignUpForm()
     return render(request, 'accounts/signup.html', {'form': form})
 
-
 def login_view(request):
     """
-    Login view: uses AuthenticationForm and safely handles `next`.
+    Function-based login. Keeps existing behaviour but also injects
+    selected_state from session into the template context for initial display.
     """
     next_url = request.GET.get('next') or request.POST.get('next') or None
     if isinstance(next_url, str) and next_url.lower() == 'none':
@@ -37,7 +63,7 @@ def login_view(request):
 
     if request.method == 'POST':
         form = AuthenticationForm(request, data=request.POST)
-        # style widgets if you like (view already did this earlier)
+        # styling widgets (safe-guarded)
         try:
             form.fields['username'].widget.attrs.update({
                 'class': 'py-2.5 px-4 block w-full border border-gray-200 rounded-lg sm:text-sm focus:border-blue-500 focus:ring-blue-500',
@@ -48,7 +74,6 @@ def login_view(request):
                 'placeholder': 'Your Password'
             })
         except Exception:
-            # if form structure differs, ignore styling step
             pass
 
         if form.is_valid():
@@ -56,7 +81,6 @@ def login_view(request):
             login(request, user)
             messages.success(request, f"Welcome back, {user.username}!")
 
-            # Only redirect to next_url when it looks safe.
             if next_url:
                 allowed = url_has_allowed_host_and_scheme(
                     url=next_url,
@@ -71,7 +95,6 @@ def login_view(request):
             messages.error(request, "Invalid credentials. Try again.")
     else:
         form = AuthenticationForm()
-        # try to set same widget classes for GET
         try:
             form.fields['username'].widget.attrs.update({
                 'class': 'py-2.5 px-4 block w-full border border-gray-200 rounded-lg sm:text-sm focus:border-blue-500 focus:ring-blue-500',
@@ -84,14 +107,23 @@ def login_view(request):
         except Exception:
             pass
 
-    return render(request, 'accounts/login.html', {'form': form, 'next': next_url})
+    # include selected_state from session so template can show it server-side
+    selected_state = request.session.get(SESSION_STATE_KEY)
+
+    return render(request, 'accounts/login.html', {
+        'form': form,
+        'next': next_url,
+        'selected_state': selected_state,
+    })
 
 
 @require_POST
 def logout_view(request):
-    """
-    Logout via POST and redirect to login.
-    """
+    """Logout (POST-only) and clear selected_state from session."""
+    try:
+        request.session.pop(SESSION_STATE_KEY, None)
+    except Exception:
+        pass
     logout(request)
     messages.info(request, "You have been logged out.")
     return redirect('login')
@@ -99,9 +131,72 @@ def logout_view(request):
 
 @login_required
 def dashboard_view(request):
-    """
-    Dashboard view - keep simple and resilient.
-    """
-    context = {'user': request.user}
+    selected_state = request.session.get(SESSION_STATE_KEY)
+    context = {
+        'user': request.user,
+        'selected_state': selected_state,
+    }
     return render(request, 'accounts/dashboard.html', context)
 
+
+# put this in accounts/views.py (replace your current select_state)
+from django.http import JsonResponse
+from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
+from django.conf import settings
+
+def select_state(request):
+    """
+    Accept AJAX POST to save `selected_state` in session and return JSON (no redirect).
+    For non-AJAX calls it falls back to redirecting to login preserving a safe `next`.
+    """
+    raw_state = request.POST.get('state') or request.GET.get('state')
+    state = _sanitize_state_name(raw_state) if raw_state else None
+
+    # optional validation
+    if state and ALLOWED_STATES:
+        if state not in ALLOWED_STATES:
+            state = None
+
+    if state:
+        request.session[SESSION_STATE_KEY] = state
+
+    # detect AJAX from fetch header
+    is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
+    if is_ajax:
+        return JsonResponse({'ok': True, 'state': state or ''})
+
+    # fallback: preserve previous behavior for non-AJAX
+    requested_next = request.GET.get('next') or request.POST.get('next') or reverse('dashboard')
+    try:
+        is_safe = url_has_allowed_host_and_scheme(
+            url=requested_next,
+            allowed_hosts={request.get_host(), *getattr(settings, 'ALLOWED_HOSTS', [])},
+            require_https=request.is_secure(),
+        )
+    except Exception:
+        is_safe = False
+
+    if not is_safe:
+        requested_next = reverse('dashboard')
+
+    # ALWAYS send to login (preserve next)
+    login_url = reverse('login')
+    return redirect(f"{login_url}?next={requested_next}")
+
+
+# Optional class-based login if you want to use Django's LoginView instead:
+class StateAwareLoginView(LoginView):
+    template_name = 'accounts/login.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        # optionally accept ?state=... on the login URL and persist to session
+        state = request.GET.get('state')
+        if state:
+            s = _sanitize_state_name(state)
+            if ALLOWED_STATES:
+                if s in ALLOWED_STATES:
+                    request.session[SESSION_STATE_KEY] = s
+            else:
+                request.session[SESSION_STATE_KEY] = s
+        return super().dispatch(request, *args, **kwargs)
