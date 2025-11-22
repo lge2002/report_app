@@ -8,111 +8,180 @@
 
   <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Styles -->
   <link rel="stylesheet" href="{% static 'css/style.css' %}" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
+
+  <!-- Small local CSS to keep right-panel visible when sidebar overlays -->
+  <style>
+    aside[aria-label="Sidebar"] { z-index: 30; position: relative; }
+    .offcanvas, .sidebar-overlay, .slide-over { z-index: 30 !important; }
+    .right-panel-card { position: relative; z-index: 40; }
+    .right-panel-card > * { position: relative; z-index: 40; }
+    @media (min-width: 1024px) {
+      .right-panel-inner { display: flex; align-items: center; justify-content: center; height: 100%; }
+    }
+  </style>
 </head>
 
-<body class="bg-gray-100 text-gray-800">
+<body class="bg-gray-100 text-gray-800 h-screen overflow-hidden">
 
+  <!-- Top navbar -->
   {% include "partials/navbar.html" %}
 
-  <div class="flex item-left max-w-7xl mx-auto mt-10 p-4">
-    <div class="grid grid-cols-1 lg:grid-cols-10 gap-6">
+  <!-- Main max-width container -->
+  <div class="max-w-7xl h-full p-4 flex justify-start overflow-hidden">
 
-      <!-- LEFT: Main card (takes left columns) -->
-      <main class="lg:col-span-8">
-        <div class="bg-white shadow-md rounded-lg overflow-hidden">
+    <div class="flex gap-6 -ml-32"> 
 
-          <!-- Header -->
-          <div class="flex items-center justify-between p-6 border-b">
-            <div>
-              <h1 class="text-2xl font-semibold">PSP Reports</h1>
-              <p class="text-sm text-gray-500">Select a date and view state-wise report</p>
+      <!-- Sidebar (hidden on small screens) -->
+      <aside class="w-64 hidden lg:block" aria-label="Sidebar">
+        {% include "partials/sidebar.html" %}
+      </aside>
+
+      <!-- Main content area -->
+      <main class="flex-1 h-full overflow-hidden">
+
+        <div class="grid grid-cols-1 lg:grid-cols-10 gap-6 h-full">
+
+          <!-- LEFT: Main card (spans 8/10 on large screens) -->
+          <section class="lg:col-span-8 h-full">
+            <div class="bg-white shadow-md rounded-lg overflow-hidden  flex flex-col">
+
+              <!-- Header -->
+              <header class="flex items-center justify-between p-6 border-b flex-shrink-0">
+                <div>
+                  <h1 class="text-2xl font-semibold">PSP Reports</h1>
+                  <p class="text-sm text-gray-500">Select a date and view state-wise report</p>
+                </div>
+
+                <div class="text-right text-sm text-gray-600">
+                  {% if selected_state %}
+                    <div>State: <span class="font-medium">{{ selected_state }}</span></div>
+                  {% endif %}
+                  {% if selected_date %}
+                    <div>Date: <span class="font-medium">{{ selected_date }}</span></div>
+                  {% endif %}
+                </div>
+              </header>
+
+              <!-- Controls -->
+              <div class="p-3 flex-shrink-0">
+                <form method="GET" class="flex flex-col md:flex-row md:items-center gap-4" role="search" aria-label="Select date and view">
+                  <label for="date_input" class="sr-only">Select Date</label>
+
+                  <input
+                    id="date_input"
+                    name="date"
+                    type="text"
+                    class="w-full md:w-64 p-3 border rounded-md bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    placeholder="Choose a date"
+                    {% if selected_date %} value="{{ selected_date }}" {% endif %}
+                    autocomplete="off"
+                  />
+
+                  <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition" aria-label="View reports">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3M3 11h18M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                    VIEW
+                  </button>
+
+                  <button type="button" id="refreshBtn" class="ml-auto md:ml-0 inline-flex items-center gap-2 px-3 py-2 border rounded-md text-sm text-gray-700 hover:bg-gray-50" aria-label="Refresh data">
+                    Refresh
+                  </button>
+                </form>
+              </div>
+
+              <!-- Table -->
+              <!-- Make table area flexible and scrollable without causing page scroll -->
+              <div class="p-6 border-t overflow-auto" style="max-height: calc(100vh - 14rem);">
+                <div class="overflow-x-auto">
+                  <table class="min-w-full divide-y divide-gray-200" role="table" aria-label="PSP report table">
+                    <thead class="bg-blue-50">
+                      <tr>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">S.No.</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">Plants</th>
+                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-600">MU</th>
+                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-600">Contribution %</th>
+                      </tr>
+                    </thead>
+                    <tbody id="psp-tbody" class="bg-white divide-y divide-gray-100">
+                      {# Nine placeholder rows by default #}
+                      {% for _ in "123456789" %}
+                        <tr class="hover:bg-gray-50">
+                          <td class="px-4 py-3 text-sm text-gray-700">{{ forloop.counter }}</td>
+                          <td class="px-4 py-3 text-sm text-gray-700">&nbsp;</td>
+                          <td class="px-4 py-3 text-sm text-right text-gray-700">&nbsp;</td>
+                          <td class="px-4 py-3 text-sm text-right text-gray-700">&nbsp;</td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div id="psp-footer" class="mt-4 text-xs text-gray-500">
+                  Tip: Click <strong>VIEW</strong> after selecting a date to fetch state data.
+                </div>
+              </div>
+
             </div>
-            <div class="text-right text-sm text-gray-600">
-              {% if selected_state %}<div>State: <span class="font-medium">{{ selected_state }}</span></div>{% endif %}
-              {% if selected_date %}<div>Date: <span class="font-medium">{{ selected_date }}</span></div>{% endif %}
+          </section>
+
+          <!-- RIGHT: small boxed table placed here and sized to match left -->
+          <aside class="lg:col-span-2 hidden lg:block" aria-label="Right panel">
+            <!-- Use same visual card style as left and match height using calc -->
+            <div class="bg-white rounded-lg shadow-md p-4 w-full right-panel-card" style="height: calc(100vh - 14rem); overflow:auto;">
+              <!-- center the small box -->
+              <div class="right-panel-inner">
+                <!-- small boxed table (Tailwind) -->
+                <div class="w-40 h-40 bg-white border rounded-md shadow-sm p-2 flex items-center justify-center overflow-hidden">
+                  <table class="text-sm w-full">
+                    <tbody>
+                      <tr>
+                        <td class="text-center">wgev</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
-          </div>
+          </aside>
 
-          <!-- Controls -->
-          <div class="p-6">
-            <form method="GET" class="flex flex-col md:flex-row md:items-center gap-4">
-              <label for="date_input" class="sr-only">Select Date</label>
+        </div> <!-- end grid -->
 
-              <input
-                id="date_input"
-                name="date"
-                type="text"
-                class="w-full md:w-64 p-3 border rounded-md bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                placeholder="Choose a date"
-                {% if selected_date %} value="{{ selected_date }}" {% endif %}
-              />
+        <!-- Place where child templates can inject page-specific content -->
+        {% block content %}{% endblock %}
 
-              <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3M3 11h18M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                VIEW
-              </button>
+      </main> <!-- end main content area -->
 
-              <button type="button" id="refreshBtn" class="ml-auto md:ml-0 inline-flex items-center gap-2 px-3 py-2 border rounded-md text-sm text-gray-700 hover:bg-gray-50">
-                Refresh
-              </button>
-            </form>
-          </div>
+    </div> <!-- end flex: sidebar + main -->
 
-          <!-- Table -->
-          <div class="p-6 border-t">
-            <div class="overflow-x-auto">
-              <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-blue-50">
-                  <tr>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">S.No.</th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">Plants</th>
-                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-600">MU</th>
-                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-600">Contribution %</th>
-                  </tr>
-                </thead>
-                <tbody id="psp-tbody" class="bg-white divide-y divide-gray-100">
-                  {# nine placeholder rows by default #}
-                  {% for _ in "123456789" %}
-                    <tr class="hover:bg-gray-50">
-                      <td class="px-4 py-3 text-sm text-gray-700">{{ forloop.counter }}</td>
-                      <td class="px-4 py-3 text-sm text-gray-700">&nbsp;</td>
-                      <td class="px-4 py-3 text-sm text-right text-gray-700">&nbsp;</td>
-                      <td class="px-4 py-3 text-sm text-right text-gray-700">&nbsp;</td>
-                    </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
+  </div> <!-- end max-width container -->
 
-            <!-- small footer note -->
-            <div class="mt-4 text-xs text-gray-500">Tip: Click <strong>VIEW</strong> after selecting a date to fetch state data.</div>
-          </div>
-        </div>
-      </main>
-
-
-    </div>
-  </div>
-
+  <!-- Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-
   <script>
+    // flatpickr init
     flatpickr("#date_input", {
       dateFormat: "Y-m-d",
       allowInput: true,
     });
 
-    // CONFIG: set this to your API endpoint when ready.
-    const dataApiUrl = ""; // set to "/api/psp-data/"
+    // Asset preview path you uploaded (available in the container)
+    const assetPreviewUrl = "/mnt/data/fed3832a-5237-43dc-a6f3-f20fa3f8a675.png";
+
+    // Point this to your DRF endpoint (don't include domain if same-origin)
+    const dataApiUrl = "/api/dailyreports/combined-psp/";
 
     const selectedState = "{{ selected_state|default:''|escapejs }}";
     const selectedDate  = "{{ selected_date|default:''|escapejs }}";
     const tbody = document.getElementById('psp-tbody');
     const refreshBtn = document.getElementById('refreshBtn');
+    const footer = document.getElementById('psp-footer');
 
-    function renderEmptyRows() {
+    function renderEmptyRows(message) {
       tbody.innerHTML = '';
       for (let i = 1; i <= 9; i++) {
         const tr = document.createElement('tr');
@@ -125,6 +194,8 @@
         `;
         tbody.appendChild(tr);
       }
+      if (message) footer.innerHTML = message;
+      else footer.innerHTML = 'Tip: Click <strong>VIEW</strong> after selecting a date to fetch state data.';
     }
 
     function renderRows(dataRows) {
@@ -133,16 +204,17 @@
         const tr = document.createElement('tr');
         tr.className = 'hover:bg-gray-50';
 
+        // optional highlight support if your API supplies `highlight` key
         let extraClass = '';
         if (r.highlight === 'green') extraClass = 'bg-green-50';
         if (r.highlight === 'dark') extraClass = 'bg-gray-800 text-white';
-
         if (extraClass) tr.classList.add(...extraClass.split(' '));
 
         const sno = r.sno !== undefined ? r.sno : (idx + 1);
-        const plant = r.plant || '';
-        const mu = r.mu || '';
-        const contrib = r.contrib || '';
+        // Note: API returns `plant_name`, `mu`, `contribution_pct`
+        const plant = r.plant_name || r.plant || '';
+        const mu = (r.mu !== undefined && r.mu !== null) ? r.mu : '';
+        const contrib = (r.contribution_pct !== undefined && r.contribution_pct !== null) ? r.contribution_pct : '';
 
         tr.innerHTML = `
           <td class="px-4 py-3 text-sm text-gray-700">${sno}</td>
@@ -152,29 +224,76 @@
         `;
         tbody.appendChild(tr);
       });
+      footer.innerHTML = `<div class="text-xs text-gray-500">Showing ${dataRows.length} rows.</div>`;
     }
 
     async function fetchAndPopulate() {
+      // If dataApiUrl is empty or required params missing, show placeholders
       if (!dataApiUrl) { renderEmptyRows(); return; }
       if (!selectedState || !selectedDate) { renderEmptyRows(); return; }
 
       const url = new URL(dataApiUrl, window.location.origin);
       url.searchParams.set('state', selectedState);
       url.searchParams.set('date', selectedDate);
+      url.searchParams.set('page', 1);
+
+      // show loading state
+      footer.innerHTML = '<div class="text-xs text-gray-500">Loading...</div>';
 
       try {
-        const res = await fetch(url.toString(), { method: 'GET', headers: { 'Accept': 'application/json' }, credentials: 'same-origin' });
-        if (!res.ok) { renderEmptyRows(); return; }
-        const data = await res.json();
-        if (!Array.isArray(data) || data.length === 0) { renderEmptyRows(); return; }
-        renderRows(data);
-      } catch (err) { console.error(err); renderEmptyRows(); }
+        const res = await fetch(url.toString(), {
+          method: 'GET',
+          headers: { 'Accept': 'application/json' },
+          credentials: 'same-origin' // uses Django session auth
+        });
+
+        if (res.status === 401 || res.status === 403) {
+          // user not authenticated - show friendly login link
+          tbody.innerHTML = '';
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td colspan="4" class="px-4 py-6 text-center text-sm text-red-600">You must <a href="/admin/login/?next=${encodeURIComponent(window.location.pathname)}" class="underline">log in</a> to see PSP data.</td>`;
+          tbody.appendChild(tr);
+          footer.innerHTML = '';
+          return;
+        }
+
+        if (!res.ok) {
+          console.error('API error status', res.status);
+          renderEmptyRows('Error loading data. Check console for details.');
+          return;
+        }
+
+        const json = await res.json();
+
+        // Normalize response shape
+        let rows = [];
+        if (Array.isArray(json)) rows = json;
+        else if (json.results && json.results.rows) rows = json.results.rows;
+        else if (json.rows) rows = json.rows;
+        else if (json.results && Array.isArray(json.results)) rows = json.results;
+        else {
+          // Some paginators wrap payload into results -> { total_mu, rows: [...] }
+          if (json.results && typeof json.results === 'object' && Array.isArray(json.results.rows)) {
+            rows = json.results.rows;
+          }
+        }
+
+        if (!rows || rows.length === 0) {
+          renderEmptyRows('No data found for the selected date/state.');
+          return;
+        }
+
+        renderRows(rows);
+
+      } catch (err) {
+        console.error('Fetch error', err);
+        renderEmptyRows('Network error while loading data.');
+      }
     }
 
+    // Hook events
     refreshBtn.addEventListener('click', fetchAndPopulate);
     document.addEventListener('DOMContentLoaded', fetchAndPopulate);
   </script>
-
-  {% block content %}{% endblock %}
 </body>
 </html>

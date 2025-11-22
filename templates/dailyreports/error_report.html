@@ -4,81 +4,140 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>PSP</title>
+  <title>Error Reports </title>
 
   <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Styles -->
   <link rel="stylesheet" href="{% static 'css/style.css' %}" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
 </head>
 
 <body class="bg-gray-100 text-gray-800">
 
+  <!-- Top navbar -->
   {% include "partials/navbar.html" %}
 
-  <div class="flex item-left max-w-7xl mx-auto mt-10 p-4">
-    <div class="grid grid-cols-1 lg:grid-cols-10 gap-6">
+  <!-- Main max-width container -->
+  <div class="max-w-7xl mx-auto mt-10 p-4">
 
-      <!-- LEFT: Main card (takes left columns) -->
-      <main class="lg:col-span-8">
-        <div class="bg-white shadow-md rounded-lg overflow-hidden">
+    <!-- Layout: sidebar + main -->
+    <div class="flex gap-6">
 
-          <!-- Header -->
-          <div class="flex items-center justify-between p-6 border-b">
-            <div>
-              <h1 class="text-2xl font-semibold">ERROR Reports</h1>
-              <p class="text-sm text-gray-500">Select a date and view state-wise report</p>
+      <!-- Sidebar (hidden on small screens) -->
+      <aside class="w-64 hidden lg:block" aria-label="Sidebar">
+        {% include "partials/sidebar.html" %}
+      </aside>
+
+      <!-- Main content area -->
+      <main class="flex-1">
+
+        <div class="grid grid-cols-1 lg:grid-cols-10 gap-6">
+
+          <!-- LEFT: Main card (spans 8/10 on large screens) -->
+          <section class="lg:col-span-8">
+            <div class="bg-white shadow-md rounded-lg overflow-hidden">
+
+              <!-- Header -->
+              <header class="flex items-center justify-between p-6 border-b">
+                <div>
+                  <h1 class="text-2xl font-semibold">Error Reports</h1>
+                  <p class="text-sm text-gray-500">Select a date and view state-wise report</p>
+                </div>
+
+                <div class="text-right text-sm text-gray-600">
+                  {% if selected_state %}
+                    <div>State: <span class="font-medium">{{ selected_state }}</span></div>
+                  {% endif %}
+                  {% if selected_date %}
+                    <div>Date: <span class="font-medium">{{ selected_date }}</span></div>
+                  {% endif %}
+                </div>
+              </header>
+
+              <!-- Controls -->
+              <div class="p-6">
+                <form method="GET" class="flex flex-col md:flex-row md:items-center gap-4" role="search" aria-label="Select date and view">
+                  <label for="date_input" class="sr-only">Select Date</label>
+
+                  <input
+                    id="date_input"
+                    name="date"
+                    type="text"
+                    class="w-full md:w-64 p-3 border rounded-md bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    placeholder="Choose a date"
+                    {% if selected_date %} value="{{ selected_date }}" {% endif %}
+                    autocomplete="off"
+                  />
+
+                  <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition" aria-label="View reports">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3M3 11h18M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                    VIEW
+                  </button>
+
+                  <button type="button" id="refreshBtn" class="ml-auto md:ml-0 inline-flex items-center gap-2 px-3 py-2 border rounded-md text-sm text-gray-700 hover:bg-gray-50" aria-label="Refresh data">
+                    Refresh
+                  </button>
+                </form>
+              </div>
+
+              <!-- Table -->
+              <div class="p-6 border-t">
+                <div class="overflow-x-auto">
+                  <table class="min-w-full divide-y divide-gray-200" role="table" aria-label="PSP report table">
+                    <thead class="bg-blue-50">
+                      <tr>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">S.No.</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">Plants</th>
+                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-600">MU</th>
+                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-600">Contribution %</th>
+                      </tr>
+                    </thead>
+                    <tbody id="psp-tbody" class="bg-white divide-y divide-gray-100">
+                      {# Nine placeholder rows by default #}
+                      {% for _ in "123456789" %}
+                        <tr class="hover:bg-gray-50">
+                          <td class="px-4 py-3 text-sm text-gray-700">{{ forloop.counter }}</td>
+                          <td class="px-4 py-3 text-sm text-gray-700">&nbsp;</td>
+                          <td class="px-4 py-3 text-sm text-right text-gray-700">&nbsp;</td>
+                          <td class="px-4 py-3 text-sm text-right text-gray-700">&nbsp;</td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div class="mt-4 text-xs text-gray-500">
+                  Tip: Click <strong>VIEW</strong> after selecting a date to fetch state data.
+                </div>
+              </div>
+
             </div>
-            <div class="text-right text-sm text-gray-600">
-              {% if selected_state %}<div>State: <span class="font-medium">{{ selected_state }}</span></div>{% endif %}
-              {% if selected_date %}<div>Date: <span class="font-medium">{{ selected_date }}</span></div>{% endif %}
-            </div>
-          </div>
+          </section>
 
-          <!-- Controls -->
-          <div class="p-6">
-            <form method="GET" class="flex flex-col md:flex-row md:items-center gap-4">
-              <label for="date_input" class="sr-only">Select Date</label>
+          <!-- RIGHT: You can add a right-side panel here if needed -->
+          <aside class="lg:col-span-2 hidden lg:block" aria-label="Right panel">
+            <!-- placeholder for additional widgets / summary -->
+          </aside>
 
-              <input
-                id="date_input"
-                name="date"
-                type="text"
-                class="w-full md:w-64 p-3 border rounded-md bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                placeholder="Choose a date"
-                {% if selected_date %} value="{{ selected_date }}" {% endif %}
-              />
+        </div> <!-- end grid -->
 
-              <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3M3 11h18M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                VIEW
-              </button>
+        <!-- Place where child templates can inject page-specific content -->
+        {% block content %}{% endblock %}
 
-              <button type="button" id="refreshBtn" class="ml-auto md:ml-0 inline-flex items-center gap-2 px-3 py-2 border rounded-md text-sm text-gray-700 hover:bg-gray-50">
-                Refresh
-              </button>
-            </form>
-          </div>
+      </main> <!-- end main content area -->
 
-          <!-- Table -->
-          <div class="p-6 border-t">
-            <div class="overflow-x-auto">
-              
-            </div>
+    </div> <!-- end flex: sidebar + main -->
 
-            <!-- small footer note -->
-            <div class="mt-4 text-xs text-gray-500">Tip: Click <strong>VIEW</strong> after selecting a date to fetch state data.</div>
-          </div>
-        </div>
-      </main>
+  </div> <!-- end max-width container -->
 
-
-    </div>
-  </div>
-
+  <!-- Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-
   <script>
+    // flatpickr init
     flatpickr("#date_input", {
       dateFormat: "Y-m-d",
       allowInput: true,
@@ -154,7 +213,5 @@
     refreshBtn.addEventListener('click', fetchAndPopulate);
     document.addEventListener('DOMContentLoaded', fetchAndPopulate);
   </script>
-
-  {% block content %}{% endblock %}
 </body>
 </html>

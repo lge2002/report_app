@@ -89,7 +89,6 @@ def daily_windy_power(request):
         "title": "Daily Wind Report Generation",
         "selected_state": selected_state,
         "date": date,
-        "preview_image": "/mnt/data/979ee8e8-59f4-47a7-add1-68f484a32caf.png",
     }
     return render(request, "dailyreports/daily_windy_power.html", params)
 
@@ -133,6 +132,5 @@ def accuracy_report(request):
         "selected_state": selected_state,
         "month": month,
         "year": year,
-        "preview_image": "/mnt/data/979ee8e8-59f4-47a7-add1-68f484a32caf.png",
     }
     return render(request, "dailyreports/accuracy_report.html", context)

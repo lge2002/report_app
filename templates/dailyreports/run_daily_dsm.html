@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>PSP</title>
+  <title>Run Daily DSM</title>
 
   <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -15,86 +15,197 @@
 
   {% include "partials/navbar.html" %}
 
+  <!-- MOBILE: sidebar toggle button (visible on small screens) -->
+  <button id="sidebarToggle"
+          class="fixed z-40 top-4 left-4 inline-flex items-center justify-center p-2 rounded-md bg-white border shadow-sm lg:hidden"
+          aria-label="Open sidebar"
+          type="button">
+    <!-- hamburger icon -->
+    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+    </svg>
+  </button>
 
-  <div class="flex item-left max-w-4xl mx-auto mt-6 p-3">
-    <div class="grid grid-cols-1 lg:grid-cols-6 gap-3 w-full">
+  <!-- Sidebar overlay for mobile -->
+  <div id="sidebarOverlay" class="fixed inset-0 bg-black/40 z-30 hidden lg:hidden"></div>
 
-      <!-- LEFT: Main card (takes left columns) -->
-      <main class="lg:col-span-5 w-full">
-        <div class="bg-white shadow-md rounded-lg overflow-hidden">
+  <div class="flex gap-6">
 
-          <!-- Header -->
-          <div class="flex items-center justify-between p-4 border-b">
-            <div>
-              <h1 class="text-xl font-semibold">Run Daily DSM</h1>
-              <p class="text-sm text-gray-500">Select month &amp; year and view state-wise report</p>
-            </div>
-            <div class="text-right text-sm text-gray-600">
-              {% if selected_state %}<div>State: <span class="font-medium">{{ selected_state }}</span></div>{% endif %}
-              {% if selected_date %}<div>Date: <span class="font-medium">{{ selected_date }}</span></div>{% endif %}
+    <!-- Sidebar (slides on mobile, static on large screens) -->
+    <aside id="sidebar"
+           class="z-40 fixed top-0 left-0 h-full w-64 bg-white border-r overflow-y-auto transform -translate-x-full transition-transform duration-300 ease-in-out lg:translate-x-0 lg:relative lg:top-auto lg:left-auto lg:h-auto lg:block lg:w-64">
+      <!-- add a small close button for mobile (visible only on small screens) -->
+      <div class="flex items-center justify-between p-4 border-b lg:hidden">
+        <h3 class="text-lg font-semibold">Menu</h3>
+        <button id="sidebarClose" class="p-1 rounded-md" aria-label="Close sidebar">
+          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Include your sidebar partial (menu items) -->
+      <div class="p-4">
+        {% include "partials/sidebar.html" %}
+      </div>
+    </aside>
+
+    <!-- Main content area -->
+    <main id="mainContent" class="flex-1 lg:ml-0">
+      <div class="flex item-left max-w-4xl mx-auto mt-6 p-3">
+        <div class="grid grid-cols-1 lg:grid-cols-6 gap-3 w-full">
+
+          <!-- LEFT: Main card (takes left columns) -->
+          <div class="lg:col-span-5 w-full">
+            <div class="bg-white shadow-md rounded-lg overflow-hidden">
+
+              <!-- Header -->
+              <div class="flex items-center justify-between p-4 border-b">
+                <div>
+                  <h1 class="text-xl font-semibold">Run Daily DSM</h1>
+                  <p class="text-sm text-gray-500">Select month &amp; year and view state-wise report</p>
+                </div>
+                <div class="text-right text-sm text-gray-600">
+                  {% if selected_state %}<div>State: <span class="font-medium">{{ selected_state }}</span></div>{% endif %}
+                  {% if selected_date %}<div>Date: <span class="font-medium">{{ selected_date }}</span></div>{% endif %}
+                </div>
+              </div>
+
+              <!-- Controls: Month + Year + Buttons -->
+              <div class="p-4">
+                <form method="GET" id="monthYearForm" class="flex flex-col md:flex-row md:items-center gap-3">
+                  <!-- Month select -->
+                  <label for="month_select" class="sr-only">Month</label>
+                  <select id="month_select" name="month" class="w-full md:w-40 p-2 border rounded-md bg-white">
+                    <option value="">-- Month --</option>
+                    <option value="01">January</option>
+                    <option value="02">February</option>
+                    <option value="03">March</option>
+                    <option value="04">April</option>
+                    <option value="05">May</option>
+                    <option value="06">June</option>
+                    <option value="07">July</option>
+                    <option value="08">August</option>
+                    <option value="09">September</option>
+                    <option value="10">October</option>
+                    <option value="11">November</option>
+                    <option value="12">December</option>
+                  </select>
+
+                  <!-- Year select (populated by JS with current year ±5) -->
+                  <label for="year_select" class="sr-only">Year</label>
+                  <select id="year_select" name="year" class="w-full md:w-28 p-2 border rounded-md bg-white">
+                    <option value="">-- Year --</option>
+                  </select>
+
+                  <!-- VIEW button (submits GET with month & year) -->
+                  <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">
+                    VIEW
+                  </button>
+
+                  <!-- Export Excel (CSV) button -->
+                  <button type="button" id="exportCsvBtn" class="inline-flex items-center gap-2 px-3 py-2 border rounded-md text-sm text-gray-700 bg-gr hover:bg-gray-50 ml-auto md:ml-0">
+                    Export Excel
+                  </button>
+
+                  <!-- Refresh -->
+                  <button type="button" id="refreshBtn" class="inline-flex items-center gap-2 px-3 py-2 border rounded-md text-sm text-gray-700 hover:bg-gray-50">
+                    Refresh
+                  </button>
+                </form>
+              </div>
+
+              <!-- Table -->
+              <div class="p-4 border-t">
+                <div class="overflow-x-auto">
+                  <!-- you can add your table markup here -->
+                  <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-blue-50">
+                      <tr>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-600">S.No.</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-600">Plants</th>
+                        <th class="px-3 py-2 text-right text-xs font-medium text-gray-600">MU</th>
+                        <th class="px-3 py-2 text-right text-xs font-medium text-gray-600">Contribution %</th>
+                      </tr>
+                    </thead>
+                    <tbody id="psp-tbody" class="bg-white divide-y divide-gray-100">
+                      {# placeholder rows #}
+                      {% for _ in "123456789" %}
+                      <tr class="hover:bg-gray-50">
+                        <td class="px-3 py-2 text-sm text-gray-700">{{ forloop.counter }}</td>
+                        <td class="px-3 py-2 text-sm text-gray-700">&nbsp;</td>
+                        <td class="px-3 py-2 text-sm text-right text-gray-700">&nbsp;</td>
+                        <td class="px-3 py-2 text-sm text-right text-gray-700">&nbsp;</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+
+                <!-- small footer note -->
+                <div class="mt-3 text-xs text-gray-500">Tip: Choose month &amp; year then click <strong>VIEW</strong> to fetch state data. Export will download the currently visible table.</div>
+              </div>
             </div>
           </div>
 
-          <!-- Controls: Month + Year + Buttons -->
-          <div class="p-4">
-            <form method="GET" id="monthYearForm" class="flex flex-col md:flex-row md:items-center gap-3">
-              <!-- Month select -->
-              <label for="month_select" class="sr-only">Month</label>
-              <select id="month_select" name="month" class="w-full md:w-40 p-2 border rounded-md bg-white">
-                <option value="">-- Month --</option>
-                <option value="01">January</option>
-                <option value="02">February</option>
-                <option value="03">March</option>
-                <option value="04">April</option>
-                <option value="05">May</option>
-                <option value="06">June</option>
-                <option value="07">July</option>
-                <option value="08">August</option>
-                <option value="09">September</option>
-                <option value="10">October</option>
-                <option value="11">November</option>
-                <option value="12">December</option>
-              </select>
-
-              <!-- Year select (populated by JS with current year ±5) -->
-              <label for="year_select" class="sr-only">Year</label>
-              <select id="year_select" name="year" class="w-full md:w-28 p-2 border rounded-md bg-white">
-                <option value="">-- Year --</option>
-              </select>
-
-              <!-- VIEW button (submits GET with month & year) -->
-              <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">
-                VIEW
-              </button>
-
-              <!-- Export Excel (CSV) button -->
-              <button type="button" id="exportCsvBtn" class="inline-flex items-center gap-2 px-3 py-2 border rounded-md text-sm text-gray-700 bg-gr hover:bg-gray-50 ml-auto md:ml-0">
-                Export Excel
-              </button>
-
-              <!-- Refresh -->
-              <button type="button" id="refreshBtn" class="inline-flex items-center gap-2 px-3 py-2 border rounded-md text-sm text-gray-700 hover:bg-gray-50">
-                Refresh
-              </button>
-            </form>
-          </div>
-
-          <!-- Table -->
-          <div class="p-4 border-t">
-            <div class="overflow-x-auto">
-              
-            </div>
-
-            <!-- small footer note -->
-            <div class="mt-3 text-xs text-gray-500">Tip: Choose month &amp; year then click <strong>VIEW</strong> to fetch state data. Export will download the currently visible table.</div>
-          </div>
         </div>
-      </main>
-
-    </div>
+      </div>
+    </main>
   </div>
 
+  <!-- JS: year populate + data + sidebar behavior -->
   <script>
+    // Sidebar toggling
+    (function () {
+      const sidebar = document.getElementById('sidebar');
+      const toggle = document.getElementById('sidebarToggle');
+      const closeBtn = document.getElementById('sidebarClose');
+      const overlay = document.getElementById('sidebarOverlay');
+
+      function openSidebar() {
+        sidebar.classList.remove('-translate-x-full');
+        overlay.classList.remove('hidden');
+        // ensure overlay accessible
+        overlay.style.display = 'block';
+      }
+      function closeSidebar() {
+        // on large screens the sidebar is always visible via lg:translate-x-0; we only hide on small
+        if (!sidebar) return;
+        sidebar.classList.add('-translate-x-full');
+        overlay.classList.add('hidden');
+        overlay.style.display = 'none';
+      }
+
+      if (toggle) {
+        toggle.addEventListener('click', openSidebar);
+      }
+      if (closeBtn) {
+        closeBtn.addEventListener('click', closeSidebar);
+      }
+      if (overlay) {
+        overlay.addEventListener('click', closeSidebar);
+      }
+      // close on ESC
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeSidebar();
+      });
+
+      // On window resize, ensure overlay hidden on large screens
+      window.addEventListener('resize', function () {
+        if (window.innerWidth >= 1024) {
+          // remove transform classes to allow lg rules to control layout
+          sidebar.classList.remove('-translate-x-full');
+          overlay.classList.add('hidden');
+          overlay.style.display = 'none';
+        } else {
+          // small screens start closed
+          sidebar.classList.add('-translate-x-full');
+          overlay.classList.add('hidden');
+          overlay.style.display = 'none';
+        }
+      });
+    })();
+
     // Populate year select with currentYear +/- 5
     (function populateYears() {
       const yearSelect = document.getElementById('year_select');
@@ -130,6 +241,7 @@
     const exportCsvBtn = document.getElementById('exportCsvBtn');
 
     function renderEmptyRows() {
+      if (!tbody) return;
       tbody.innerHTML = '';
       for (let i = 1; i <= 9; i++) {
         const tr = document.createElement('tr');
@@ -145,6 +257,7 @@
     }
 
     function renderRows(dataRows) {
+      if (!tbody) return;
       tbody.innerHTML = '';
       dataRows.forEach((r, idx) => {
         const tr = document.createElement('tr');
@@ -173,8 +286,10 @@
 
     // Build params from form (month + year)
     function getFormParams() {
-      const month = document.getElementById('month_select').value;
-      const year = document.getElementById('year_select').value;
+      const m = document.getElementById('month_select');
+      const y = document.getElementById('year_select');
+      const month = m ? m.value : '';
+      const year = y ? y.value : '';
       return { month, year };
     }
 
@@ -205,6 +320,7 @@
 
     // Export visible table to CSV
     function tableToCSV(filename = 'psp-report.csv') {
+      if (!tbody) return;
       const rows = [];
       const headers = ['S.No.', 'Plants', 'MU', 'Contribution %'];
       rows.push(headers.join(','));
@@ -212,9 +328,7 @@
       const trs = tbody.querySelectorAll('tr');
       trs.forEach(tr => {
         const cols = Array.from(tr.querySelectorAll('td')).map(td => {
-          // clean text, escape quotes
           let text = td.textContent.trim().replace(/"/g, '""');
-          // wrap in quotes if comma exists
           if (text.includes(',')) text = `"${text}"`;
           return text;
         });
@@ -234,15 +348,13 @@
     }
 
     // Events
-    refreshBtn.addEventListener('click', fetchAndPopulate);
-    exportCsvBtn.addEventListener('click', function () {
+    if (refreshBtn) refreshBtn.addEventListener('click', fetchAndPopulate);
+    if (exportCsvBtn) exportCsvBtn.addEventListener('click', function () {
       tableToCSV('psp-report.csv');
     });
 
-    // When the form is submitted via VIEW button it will reload the page with month/year in GET;
-    // after page load we attempt to fetch (so users can also use VIEW to navigate server-side)
+    // On page load, attempt to fetch (if GET params present)
     document.addEventListener('DOMContentLoaded', function () {
-      // Try to auto-fetch if month/year already present in GET (server may have set them)
       fetchAndPopulate();
     });
   </script>
