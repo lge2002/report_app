@@ -25,7 +25,8 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', lambda r: redirect('login')),   # root -> login
     path('', include('accounts.urls')),
-    path('',include('dailyreports.urls')),
+    path('api/', include('dailyreports.api.urls')),
+
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.BASE_DIR / 'static')

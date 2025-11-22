@@ -10,4 +10,5 @@ urlpatterns = [
     path('daily_reports/daily_windy_power/', views.daily_windy_power, name='daily_windy_power'),
     path('daily_reports/run_daily_dsm/', views.run_daily_dsm, name='run_daily_dsm'),
     path('daily_reports/accuracy_report/', views.accuracy_report, name='accuracy_report'),
+    
 ]
