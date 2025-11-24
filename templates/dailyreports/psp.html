@@ -1,6 +1,6 @@
 {% load static %}
 
-{# resolve placeholder static to a variable so we can use it inside filters #}
+{# placeholder image path for server-side use #}
 {% static 'images/placeholder.png' as placeholder_img %}
 
 <!doctype html>
@@ -13,211 +13,282 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="{% static 'css/style.css' %}" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
+
   <style>
+    :root { --navbar-height: 72px; } /* adjust if your navbar height differs */
+
+    /* full-screen layout: stop body from creating page-level scrollbar */
+    html, body { height: 100%; margin: 0; padding: 0; }
+    body { overflow: hidden; background: #f5f7fa; }
+
+    /* top-space so content doesn't get overlapped by navbar partial (if it's fixed) */
+    .page-content {
+      height: calc(100vh - var(--navbar-height));
+      padding-top: 1rem; /* small breathing space under navbar */
+      box-sizing: border-box;
+      overflow: hidden; /* prevent page scrollbar */
+    }
+
+    /* main area wrapper that will contain the two cards */
+    .cards-row {
+      height: 100%;
+      display: grid;
+      grid-template-columns: 1fr; /* mobile fallback */
+      gap: 1.5rem;
+    }
+
+    /* large-screen grid: left = 4 / right = 8 (≈33% / 67%) */
+    @media (min-width: 1024px) {
+      .cards-row { grid-template-columns: 40% 60%; }
+    }
+
+    /* shared card style */
+    .app-card {
+      background: #fff;
+      border-radius: 0.6rem;
+      box-shadow: 0 8px 22px rgba(15,23,42,0.06);
+      border: 1px solid rgba(0,0,0,0.04);
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    /* left card specifics: allow full content but not page scroll */
+    .left-card .card-body {
+      padding: 1.25rem;
+      overflow: visible; /* show full table, no scrollbars here */
+    }
+
+    /* right card specifics: internal scrolling only inside this panel */
+    .right-card .preview-wrap {
+      padding: 1.25rem;
+      overflow: auto; /* only this column scrolls if preview is large */
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* preview image sizing */
+    .preview-img {
+      width: 100%;
+      height: auto;
+      max-height: calc(100vh - var(--navbar-height) - 6.5rem); /* keep image within viewport */
+      object-fit: contain;
+      display: block;
+      cursor: pointer;
+      margin: 0 auto;
+    }
+
+    /* small responsive tweak */
+    @media (max-width: 1024px) {
+      .preview-img { max-height: 42vh; }
+      .cards-row { grid-template-columns: 1fr; }
+    }
+
+    /* tidy table look */
+    .psp-table th, .psp-table td { white-space: nowrap; }
+    .psp-footer { padding: 0.5rem 1.25rem; color: #6b7280; font-size: 12px; }
+
+    /* ensure partials/navbar doesn't block clicks (if fixed) */
     aside[aria-label="Sidebar"] { z-index: 30; position: relative; }
-    .offcanvas, .sidebar-overlay, .slide-over { z-index: 30 !important; }
-    .right-panel-card { position: relative; z-index: 40; }
-    .right-panel-card > * { position: relative; z-index: 40; }
+    .right-panel-card { position: relative; z-index: 10; }
   </style>
 </head>
 
-<body class="bg-gray-100 text-gray-800 h-screen overflow-hidden">
+<body class="bg-gray-100 text-gray-800">
 
   {% include "partials/navbar.html" %}
 
-  <div class="max-w-7xl h-full p-4 flex justify-start overflow-hidden">
-    <div class="flex gap-6 -ml-32">
+  <!-- page content area (fits under navbar, prevents page scrollbar) -->
+  <div class="page-content">
+    <div class="max-w-7xl mx-auto h-full px-6">
 
-      <aside class="w-64 hidden lg:block" aria-label="Sidebar">
-        {% include "partials/sidebar.html" %}
-      </aside>
+      <div class="flex gap-6 h-full">
 
-      <main class="flex-1 h-full overflow-hidden">
+        <!-- optional small sidebar (kept) -->
+        <aside class="w-16 hidden lg:block" aria-label="Sidebar">
+          {% include "partials/sidebar.html" %}
+        </aside>
 
-        <div class="grid grid-cols-1 lg:grid-cols-10 gap-6 h-full">
+        <main class="flex-1 h-full">
 
-          <!-- MAIN CONTENT -->
-          <section class="lg:col-span-8 h-full">
-            <div class="bg-white shadow-md rounded-lg overflow-hidden flex flex-col">
+          <!-- 2-box layout: left + right -->
+          <div class="cards-row h-full">
 
-              <!-- Header -->
-              <header class="flex items-center justify-between p-6 border-b">
-                <div>
-                  <h1 class="text-2xl font-semibold">PSP Reports</h1>
-                  <p class="text-sm text-gray-500">Plant breakdown for the selected state & date</p>
-                </div>
-
-                <div class="text-right text-sm text-gray-600">
-                  {% if selected_state %}
-                    <div>State: <span class="font-medium">{{ selected_state }}</span></div>
-                  {% endif %}
-                  {% if selected_date %}
-                    <div>Date: <span class="font-medium">{{ selected_date }}</span></div>
-                  {% endif %}
+            <!-- LEFT CARD -->
+            <section class="left-card app-card">
+              <header class="px-6 py-5 border-b">
+                <div class="flex items-start justify-between">
+                  <div>
+                    <h1 class="text-2xl font-semibold">PSP Reports</h1>
+                    <p class="text-sm text-gray-500 mt-1">Plant breakdown for the selected state &amp; date</p>
+                  </div>
+                  <div class="text-sm text-gray-600 text-right">
+                    {% if selected_state %}
+                      <div>State: <span class="font-medium">{{ selected_state }}</span></div>
+                    {% endif %}
+                    {% if selected_date %}
+                      <div>Date: <span class="font-medium">{{ selected_date }}</span></div>
+                    {% endif %}
+                  </div>
                 </div>
               </header>
 
-              <!-- Filters -->
-              <div class="p-3">
-                <form method="GET" class="flex flex-col md:flex-row gap-4 items-start md:items-center">
-                  <input type="hidden" id="state_input" name="state" value="{{ selected_state|default:'' }}" />
+              <div class="card-body">
 
-                  <input
-                    id="date_input"
-                    name="date"
-                    type="text"
-                    class="w-full md:w-64 p-3 border rounded-md bg-gray-50"
-                    placeholder="Select Date"
-                    value="{{ selected_date|default:today }}"
-                    aria-label="Select report date"
-                  />
+                <!-- filters -->
+                <div class="mb-4">
+                  <form method="GET" class="flex flex-col md:flex-row gap-3 items-start md:items-center">
+                    <input type="hidden" id="state_input" name="state" value="{{ selected_state|default:'' }}" />
 
-                  <button type="submit" id="viewBtn" class="px-4 py-2 bg-blue-600 text-white rounded-md">
-                    VIEW
-                  </button>
+                    <input
+                      id="date_input"
+                      name="date"
+                      type="text"
+                      class="w-full md:w-44 p-3 border rounded-md bg-gray-50 text-sm"
+                      placeholder="Select Date"
+                      value="{{ selected_date|default:today }}"
+                      aria-label="Select report date"
+                    />
 
-                  <button type="button" id="refreshBtn" class="px-3 py-2 border rounded-md">
-                    Refresh
-                  </button>
+                    <button type="submit" id="viewBtn" class="px-4 py-2 bg-blue-600 text-white rounded-md text-sm">VIEW</button>
 
-                  <div class="ml-auto hidden md:block">
-                    {# Use the placeholder_img variable instead of calling static() inside a filter #}
-                    <img id="previewImage" src="{{ preview_url|default:placeholder_img }}" alt="Preview" class="h-12 object-contain" />
-                  </div>
+                    <button type="button" id="refreshBtn" class="px-3 py-2 border rounded-md text-sm">Refresh</button>
 
-                </form>
-              </div>
+                    <div class="ml-auto hidden md:block">
+                      <img id="previewImage" src="{{ preview_url|default:placeholder_img }}" alt="Preview" class="h-10 object-contain" />
+                    </div>
+                  </form>
+                </div>
 
-              <!-- TABLE -->
-              <div class="p-6 border-t overflow-auto" style="max-height: calc(100vh - 14rem);">
-                <table class="min-w-full divide-y divide-gray-200">
-                  <thead class="bg-blue-50">
-                    <tr>
-                      <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-600">S.No</th>
-                      <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-600">Plant</th>
-                      <th scope="col" class="px-4 py-2 text-right text-xs font-medium text-gray-600">MU</th>
-                      <th scope="col" class="px-4 py-2 text-right text-xs font-medium text-gray-600">Contribution %</th>
-                    </tr>
-                  </thead>
+                <!-- table (no scrollbar here; fully visible) -->
+                <div>
+                  <table class="min-w-full divide-y divide-gray-200 psp-table">
+                    <thead class="bg-blue-50">
+                      <tr>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">S.No</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">Plant</th>
+                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-600">MU</th>
+                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-600">Contribution %</th>
+                      </tr>
+                    </thead>
 
-                  <!-- Server-side initial render: show MU values only (no percentage). -->
-                  <tbody id="psp-tbody" class="bg-white divide-y divide-gray-100">
-                    {% if initial_processor %}
-                      {% with proc=initial_processor %}
-                        <tr class="hover:bg-gray-50">
-                          <td class="px-4 py-3">1</td>
-                          <td class="px-4 py-3">Thermal</td>
-                          <td class="px-4 py-3 text-right">{{ proc.thermal|default_if_none:""|floatformat:2 }}</td>
-                          <td class="px-4 py-3 text-right"> </td>
-                        </tr>
-
-                        <tr class="hover:bg-gray-50">
-                          <td class="px-4 py-3">2</td>
-                          <td class="px-4 py-3">Hydro</td>
-                          <td class="px-4 py-3 text-right">{{ proc.hydro|default_if_none:""|floatformat:2 }}</td>
-                          <td class="px-4 py-3 text-right"> </td>
-                        </tr>
-
-                        <tr class="hover:bg-gray-50">
-                          <td class="px-4 py-3">3</td>
-                          <td class="px-4 py-3">Gas/Naptha/Diesel</td>
-                          <td class="px-4 py-3 text-right">{{ proc.gas_naptha_diesel|default_if_none:""|floatformat:2 }}</td>
-                          <td class="px-4 py-3 text-right"> </td>
-                        </tr>
-
-                        <tr class="hover:bg-gray-50">
-                          <td class="px-4 py-3">4</td>
-                          <td class="px-4 py-3">Wind</td>
-                          <td class="px-4 py-3 text-right">{{ proc.wind|default_if_none:""|floatformat:2 }}</td>
-                          <td class="px-4 py-3 text-right"> </td>
-                        </tr>
-
-                        <tr class="hover:bg-gray-50">
-                          <td class="px-4 py-3">5</td>
-                          <td class="px-4 py-3">Solar</td>
-                          <td class="px-4 py-3 text-right">{{ proc.solar|default_if_none:""|floatformat:2 }}</td>
-                          <td class="px-4 py-3 text-right"> </td>
-                        </tr>
-
-                        <tr class="hover:bg-gray-50">
-                          <td class="px-4 py-3">6</td>
-                          <td class="px-4 py-3">Others</td>
-                          <td class="px-4 py-3 text-right">{{ proc.others|default_if_none:""|floatformat:2 }}</td>
-                          <td class="px-4 py-3 text-right"> </td>
-                        </tr>
-
-                        <tr class="bg-gray-100">
-                          <td class="px-4 py-3">7</td>
-                          <td class="px-4 py-3 font-medium">Central Share</td>
-                          <td class="px-4 py-3 text-right">{{ proc.availability|default:proc.drawal|default:proc.net_sch|default_if_none:""|floatformat:2 }}</td>
-                          <td class="px-4 py-3 text-right"></td>
-                        </tr>
-
-                        <tr class="bg-gray-800 text-white">
-                          <td class="px-4 py-3">8</td>
-                          <td class="px-4 py-3 font-medium">Demand</td>
-                          <td class="px-4 py-3 text-right text-gray-100">{{ proc.demand_met|default:proc.drawal|default_if_none:""|floatformat:2 }}</td>
-                          <td class="px-4 py-3 text-right text-gray-100"></td>
-                        </tr>
-
-                        {% with shortage_value=proc.shortage|default_if_none:"0" %}
-                          <tr>
-                            <td class="px-4 py-3">9</td>
-                            <td class="px-4 py-3 font-medium">Shortage</td>
-                            <td class="px-4 py-3 text-right">{{ shortage_value|floatformat:2 }}</td>
-                            <td class="px-4 py-3 text-right"> </td>
+                    <tbody id="psp-tbody" class="bg-white divide-y divide-gray-100">
+                      {% if initial_processor %}
+                        {% with proc=initial_processor %}
+                          <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-3">1</td>
+                            <td class="px-4 py-3">Thermal</td>
+                            <td class="px-4 py-3 text-right">{{ proc.thermal|default_if_none:""|floatformat:2 }}</td>
+                            <td class="px-4 py-3 text-right"></td>
                           </tr>
+                          <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-3">2</td>
+                            <td class="px-4 py-3">Hydro</td>
+                            <td class="px-4 py-3 text-right">{{ proc.hydro|default_if_none:""|floatformat:2 }}</td>
+                            <td class="px-4 py-3 text-right"></td>
+                          </tr>
+                          <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-3">3</td>
+                            <td class="px-4 py-3">Gas/Naptha/Diesel</td>
+                            <td class="px-4 py-3 text-right">{{ proc.gas_naptha_diesel|default_if_none:""|floatformat:2 }}</td>
+                            <td class="px-4 py-3 text-right"></td>
+                          </tr>
+                          <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-3">4</td>
+                            <td class="px-4 py-3">Wind</td>
+                            <td class="px-4 py-3 text-right">{{ proc.wind|default_if_none:""|floatformat:2 }}</td>
+                            <td class="px-4 py-3 text-right"></td>
+                          </tr>
+                          <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-3">5</td>
+                            <td class="px-4 py-3">Solar</td>
+                            <td class="px-4 py-3 text-right">{{ proc.solar|default_if_none:""|floatformat:2 }}</td>
+                            <td class="px-4 py-3 text-right"></td>
+                          </tr>
+                          <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-3">6</td>
+                            <td class="px-4 py-3">Others</td>
+                            <td class="px-4 py-3 text-right">{{ proc.others|default_if_none:""|floatformat:2 }}</td>
+                            <td class="px-4 py-3 text-right"></td>
+                          </tr>
+                          <tr class="bg-gray-100">
+                            <td class="px-4 py-3">7</td>
+                            <td class="px-4 py-3 font-medium">Central Share</td>
+                            <td class="px-4 py-3 text-right">{{ proc.availability|default:proc.drawal|default:proc.net_sch|default_if_none:""|floatformat:2 }}</td>
+                            <td class="px-4 py-3 text-right"></td>
+                          </tr>
+                          <tr class="bg-gray-800 text-white">
+                            <td class="px-4 py-3">8</td>
+                            <td class="px-4 py-3 font-medium">Demand</td>
+                            <td class="px-4 py-3 text-right text-gray-100">{{ proc.demand_met|default:proc.drawal|default_if_none:""|floatformat:2 }}</td>
+                            <td class="px-4 py-3 text-right text-gray-100"></td>
+                          </tr>
+                          {% with shortage_value=proc.shortage|default_if_none:"0" %}
+                            <tr>
+                              <td class="px-4 py-3">9</td>
+                              <td class="px-4 py-3 font-medium">Shortage</td>
+                              <td class="px-4 py-3 text-right">{{ shortage_value|floatformat:2 }}</td>
+                              <td class="px-4 py-3 text-right"></td>
+                            </tr>
+                          {% endwith %}
                         {% endwith %}
-                      {% endwith %}
-                    {% else %}
-                      <tr><td colspan="4" class="p-6 text-center text-gray-400">Loading...</td></tr>
-                    {% endif %}
-                  </tbody>
-                </table>
+                      {% else %}
+                        <tr><td colspan="4" class="p-6 text-center text-gray-400">Loading...</td></tr>
+                      {% endif %}
+                    </tbody>
+                  </table>
 
-                <div id="psp-footer" class="mt-4 text-xs text-gray-500">
-                  {% if initial_processor %}
-                    Showing server-side data for {{ initial_processor.state }} ({{ initial_processor.report_date }})
-                  {% endif %}
+                  <div id="psp-footer" class="psp-footer">
+                    {% if initial_processor %}
+                      Showing plant breakdown for {{ initial_processor.state }} (report: {{ initial_processor.report_date }})
+                    {% endif %}
+                  </div>
                 </div>
               </div>
+            </section>
 
-            </div>
-          </section>
+            <!-- RIGHT CARD -->
+<section class="right-card app-card">
+  <header class="px-6 py-4 border-b flex items-center justify-between">
+    
+    <!-- Title -->
+    <h3 class="text-base font-medium leading-snug">
+      தமிழ்நாடு மின்சாரம் வழங்கல் நிலை<br />
+      <span class="text-gray-700 text-sm">TAMILNADU POWER SUPPLY POSITION</span>
+    </h3>
 
-        </div>
+    <!-- Date Column -->
+    <div class="text-right">
+      <p class="text-xs text-gray-500">Date</p>
+      <p class="text-sm font-medium">{{ selected_date }}</p>
+    </div>
 
-      </main>
+  </header>
+</section>
 
+
+
+          </div> <!-- cards-row -->
+
+        </main>
+      </div>
     </div>
   </div>
 
-  <!-- JS -->
+  <!-- JS (keeps your fetch/update and preview sync logic) -->
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script>
-    // UI init in DOMContentLoaded below
-
     const API_URL = "/api/reports/";
-    const POLL_MS = 5 * 60 * 1000; // 5 minutes
+    const POLL_MS = 5 * 60 * 1000;
     const tbody = document.getElementById("psp-tbody");
     const footer = document.getElementById("psp-footer");
     const dateInput = document.getElementById("date_input");
     const stateInput = document.getElementById("state_input");
 
-    const PLANT_ORDER = [
-      ['thermal', 'Thermal'],
-      ['hydro', 'Hydro'],
-      ['gas_naptha_diesel', 'Gas/Naptha/Diesel'],
-      ['wind', 'Wind'],
-      ['solar', 'Solar'],
-      ['others', 'Others']
-    ];
-
     function normalize(s) {
       if (!s) return '';
       return String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
     }
-
     function formatNumber(v) {
       if (v === null || v === undefined || v === '') return '';
       const n = Number(v);
@@ -225,60 +296,18 @@
       return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
-    function renderEmpty(msg) {
-      tbody.innerHTML = `<tr><td colspan="4" class="p-6 text-center text-gray-500">${msg || 'No data'}</td></tr>`;
-      footer.innerHTML = '';
-    }
-
-    function getSelectedDate() {
-      return dateInput && dateInput.value ? dateInput.value : "{{ today|escapejs }}";
-    }
-
-    function getSelectedState() {
-      return stateInput && stateInput.value ? stateInput.value : "{{ selected_state|default:''|escapejs }}";
-    }
-
     async function fetchProcessor() {
       const url = new URL(API_URL, window.location.origin);
-      url.searchParams.set('state', getSelectedState() || '');
-      url.searchParams.set('date', getSelectedDate());
-
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15000);
-
+      url.searchParams.set('state', (stateInput && stateInput.value) || '');
+      url.searchParams.set('date', (dateInput && dateInput.value) || '');
       try {
-        const res = await fetch(url.toString(), { method: 'GET', credentials: 'same-origin', headers: { 'Accept': 'application/json' }, signal: controller.signal });
-        clearTimeout(timeout);
-
-        if (res.status === 401 || res.status === 403) {
-          tbody.innerHTML = `<tr><td colspan="4" class="p-6 text-center text-red-600">You must <a href="/admin/login/?next=${encodeURIComponent(window.location.pathname)}" class="underline">log in</a> to see PSP data.</td></tr>`;
-          footer.innerHTML = '';
-          return null;
-        }
-
-        if (!res.ok) {
-          const txt = await res.text();
-          console.error('[PSP] API error', res.status, txt);
-          renderEmpty('Error loading data (see console).');
-          return null;
-        }
-
+        const res = await fetch(url.toString(), { method: 'GET', credentials: 'same-origin', headers: { 'Accept': 'application/json' } });
+        if (!res.ok) return null;
         const ct = res.headers.get('content-type') || '';
-        if (!ct.includes('application/json')) {
-          const txt = await res.text();
-          console.error('[PSP] Unexpected content-type', ct, txt);
-          renderEmpty('API returned non-JSON content. See console.');
-          return null;
-        }
-
+        if (!ct.includes('application/json')) return null;
         return await res.json();
       } catch (err) {
-        if (err.name === 'AbortError') {
-          renderEmpty('Request timed out.');
-        } else {
-          console.error('[PSP] fetch failed', err);
-          renderEmpty('Network error while loading data. See console.');
-        }
+        console.error('fetchProcessor error', err);
         return null;
       }
     }
@@ -287,8 +316,7 @@
       if (!json) return null;
       const processors = json.processor || json.processor_data || [];
       if (!Array.isArray(processors)) return null;
-
-      const want = normalize(getSelectedState());
+      const want = normalize((stateInput && stateInput.value) || '');
       let found = processors.find(p => normalize(p.state || '') === want);
       if (!found) found = processors.find(p => normalize(p.state || '').startsWith(want));
       if (!found) found = processors.find(p => normalize(p.state || '').includes(want));
@@ -299,87 +327,85 @@
     function buildRowsFromProcessor(proc) {
       if (!proc) return '<tr><td colspan="4" class="p-6 text-center text-gray-500">No processor data</td></tr>';
       const demand = Number(proc.demand_met ?? proc.drawal ?? proc.net_sch ?? 0) || 0;
-      let idx = 1;
-      let html = '';
-
-      for (const [key, label] of PLANT_ORDER) {
-        const raw = proc[key];
+      const PLANT_ORDER = [
+        ['thermal','Thermal'],
+        ['hydro','Hydro'],
+        ['gas_naptha_diesel','Gas/Naptha/Diesel'],
+        ['wind','Wind'],
+        ['solar','Solar'],
+        ['others','Others']
+      ];
+      let html = '', idx=1;
+      for (const [k,label] of PLANT_ORDER) {
+        const raw = proc[k];
         const mu = (raw === null || raw === undefined) ? '' : Number(raw);
-        const pct = (demand && mu !== '' && !Number.isNaN(mu)) ? (mu / demand) * 100 : null;
-        const pctText = pct !== null ? `${pct.toFixed(2)} %` : '';
-        html += `
-          <tr class="hover:bg-gray-50">
-            <td class="px-4 py-3 text-sm text-gray-700">${idx++}</td>
-            <td class="px-4 py-3 text-sm text-gray-700">${label}</td>
-            <td class="px-4 py-3 text-sm text-right text-gray-700">${mu !== '' ? formatNumber(mu) : ''}</td>
-            <td class="px-4 py-3 text-sm text-right text-gray-700">${pctText}</td>
-          </tr>
-        `;
+        const pct = (demand && mu !== '' && !Number.isNaN(mu)) ? (mu/demand)*100 : null;
+        html += `<tr class="hover:bg-gray-50"><td class="px-4 py-3">${idx++}</td><td class="px-4 py-3">${label}</td><td class="px-4 py-3 text-right">${mu!==''?formatNumber(mu):''}</td><td class="px-4 py-3 text-right">${pct!==null?pct.toFixed(2)+' %':''}</td></tr>`;
       }
-
-      // central share (with percentage)
-        const centralVal = Number(proc.drawal ?? proc.availability ?? proc.net_sch ?? 0);
-        const centralPct = demand ? ((centralVal / demand) * 100).toFixed(2) + ' %' : '';
-        html += `
-          <tr class="bg-gray-100">
-            <td class="px-4 py-3 text-sm text-gray-700">${idx++}</td>
-            <td class="px-4 py-3 text-sm font-medium">Central Share</td>
-            <td class="px-4 py-3 text-sm text-right text-gray-700">${centralVal ? formatNumber(centralVal) : ''}</td>
-            <td class="px-4 py-3 text-sm text-right text-gray-700">${centralPct}</td>
-          </tr>
-        `;
-
-        // demand (unchanged)
-        html += `
-          <tr class="bg-gray-800 text-white">
-            <td class="px-4 py-3 text-sm text-gray-100">${idx++}</td>
-            <td class="px-4 py-3 text-sm font-medium">Demand</td>
-            <td class="px-4 py-3 text-sm text-right text-gray-100">${demand ? formatNumber(demand) : ''}</td>
-            <td class="px-4 py-3 text-sm text-right text-gray-100"></td>
-          </tr>
-        `;
-
-
-      // shortage
+      const centralVal = Number(proc.drawal ?? proc.availability ?? proc.net_sch ?? 0);
+      const centralPct = demand ? ((centralVal/demand)*100).toFixed(2)+' %' : '';
+      html += `<tr class="bg-gray-100"><td class="px-4 py-3">${idx++}</td><td class="px-4 py-3 font-medium">Central Share</td><td class="px-4 py-3 text-right">${centralVal?formatNumber(centralVal):''}</td><td class="px-4 py-3 text-right">${centralPct}</td></tr>`;
+      html += `<tr class="bg-gray-800 text-white"><td class="px-4 py-3">${idx++}</td><td class="px-4 py-3 font-medium">Demand</td><td class="px-4 py-3 text-right">${demand?formatNumber(demand):''}</td><td class="px-4 py-3"></td></tr>`;
       const shortageVal = Number(proc.shortage ?? 0);
-      const shortagePct = demand ? ((shortageVal / demand) * 100).toFixed(2) + ' %' : '';
-      html += `
-        <tr>
-          <td class="px-4 py-3 text-sm text-gray-700">${idx++}</td>
-          <td class="px-4 py-3 text-sm font-medium">Shortage</td>
-          <td class="px-4 py-3 text-sm text-right text-gray-700">${formatNumber(shortageVal)}</td>
-          <td class="px-4 py-3 text-sm text-right text-gray-700">${shortagePct}</td>
-        </tr>
-      `;
-
+      const shortagePct = demand ? ((shortageVal/demand)*100).toFixed(2)+' %' : '';
+      html += `<tr><td class="px-4 py-3">${idx++}</td><td class="px-4 py-3 font-medium">Shortage</td><td class="px-4 py-3 text-right">${formatNumber(shortageVal)}</td><td class="px-4 py-3 text-right">${shortagePct}</td></tr>`;
       return html;
     }
 
     async function updateTable() {
-      footer.innerHTML = 'Loading...';
+      if (footer) footer.innerHTML = 'Loading...';
       const json = await fetchProcessor();
-      if (!json) return;
-
+      if (!json) { if (footer) footer.innerHTML=''; return; }
       const proc = findProcessorEntry(json);
       if (!proc) {
-        renderEmpty('No processor data for selected state/date.');
+        if (tbody) tbody.innerHTML = '<tr><td colspan="4" class="p-6 text-center text-gray-500">No processor data</td></tr>';
+        if (footer) footer.innerHTML = '';
         return;
       }
+      if (tbody) tbody.innerHTML = buildRowsFromProcessor(proc);
+      if (footer) footer.innerHTML = `<div class="text-xs text-gray-500">Showing plant breakdown for <strong>${proc.state}</strong> (report: ${proc.report_date})</div>`;
 
-      tbody.innerHTML = buildRowsFromProcessor(proc);
-      footer.innerHTML = `<div class="text-xs text-gray-500">Showing plant breakdown for <strong>${proc.state}</strong> (report: ${proc.report_date})</div>`;
+      // preview sync
+      try {
+        const previewUrl = json.preview_url || proc.preview_url || '';
+        const previewMain = document.getElementById('previewImage');
+        const previewRight = document.getElementById('previewImageRight');
+        const previewEmptyBox = document.getElementById('previewEmptyBox');
+        const previewMeta = document.getElementById('previewMeta');
+        if (previewUrl) {
+          if (previewMain) previewMain.src = previewUrl;
+          if (previewRight) previewRight.src = previewUrl;
+          if (previewEmptyBox) previewEmptyBox.classList.add('hidden');
+          if (previewMeta) previewMeta.textContent = 'Server preview';
+        } else if (previewRight && previewRight.getAttribute('src')) {
+          if (previewEmptyBox) previewEmptyBox.classList.add('hidden');
+          if (previewMeta) previewMeta.textContent = 'Local preview';
+        } else {
+          if (previewEmptyBox) previewEmptyBox.classList.remove('hidden');
+          if (previewMeta) previewMeta.textContent = 'No file selected';
+        }
+      } catch(e) { console.warn('preview sync failed', e); }
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-      flatpickr("#date_input", {
-        dateFormat: "Y-m-d",
-        allowInput: true,
-        defaultDate: "{{ selected_date|default:today }}"
-      });
-
+      flatpickr("#date_input", { dateFormat: "Y-m-d", allowInput: true, defaultDate: "{{ selected_date|default:today }}" });
       updateTable();
       setInterval(updateTable, POLL_MS);
-      document.getElementById('refreshBtn').addEventListener('click', updateTable);
+      const refreshBtn = document.getElementById('refreshBtn');
+      if (refreshBtn) refreshBtn.addEventListener('click', updateTable);
+
+      // preview click -> open full image
+      const rightImg = document.getElementById('previewImageRight');
+      if (rightImg) {
+        rightImg.addEventListener('click', () => {
+          if (rightImg.src) window.open(rightImg.src, '_blank');
+        });
+        rightImg.addEventListener('error', () => {
+          const empty = document.getElementById('previewEmptyBox');
+          if (empty) empty.classList.remove('hidden');
+          rightImg.style.display = 'none';
+        });
+      }
     });
   </script>
 </body>
