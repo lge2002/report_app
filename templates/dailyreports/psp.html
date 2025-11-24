@@ -317,25 +317,28 @@
         `;
       }
 
-      // central share
-      html += `
-        <tr class="bg-gray-100">
-          <td class="px-4 py-3 text-sm text-gray-700">${idx++}</td>
-          <td class="px-4 py-3 text-sm font-medium">Central Share</td>
-          <td class="px-4 py-3 text-sm text-right text-gray-700">${formatNumber(proc.availability ?? proc.drawal ?? proc.net_sch ?? '')}</td>
-          <td class="px-4 py-3 text-sm text-right text-gray-700"></td>
-        </tr>
-      `;
+      // central share (with percentage)
+        const centralVal = Number(proc.drawal ?? proc.availability ?? proc.net_sch ?? 0);
+        const centralPct = demand ? ((centralVal / demand) * 100).toFixed(2) + ' %' : '';
+        html += `
+          <tr class="bg-gray-100">
+            <td class="px-4 py-3 text-sm text-gray-700">${idx++}</td>
+            <td class="px-4 py-3 text-sm font-medium">Central Share</td>
+            <td class="px-4 py-3 text-sm text-right text-gray-700">${centralVal ? formatNumber(centralVal) : ''}</td>
+            <td class="px-4 py-3 text-sm text-right text-gray-700">${centralPct}</td>
+          </tr>
+        `;
 
-      // demand
-      html += `
-        <tr class="bg-gray-800 text-white">
-          <td class="px-4 py-3 text-sm text-gray-100">${idx++}</td>
-          <td class="px-4 py-3 text-sm font-medium">Demand</td>
-          <td class="px-4 py-3 text-sm text-right text-gray-100">${demand ? formatNumber(demand) : ''}</td>
-          <td class="px-4 py-3 text-sm text-right text-gray-100"></td>
-        </tr>
-      `;
+        // demand (unchanged)
+        html += `
+          <tr class="bg-gray-800 text-white">
+            <td class="px-4 py-3 text-sm text-gray-100">${idx++}</td>
+            <td class="px-4 py-3 text-sm font-medium">Demand</td>
+            <td class="px-4 py-3 text-sm text-right text-gray-100">${demand ? formatNumber(demand) : ''}</td>
+            <td class="px-4 py-3 text-sm text-right text-gray-100"></td>
+          </tr>
+        `;
+
 
       // shortage
       const shortageVal = Number(proc.shortage ?? 0);
