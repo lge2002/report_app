@@ -1,22 +1,22 @@
+from datetime import date
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
-
 
 @login_required
 def psp(request):
     selected_state = request.session.get("selected_state")
 
-    # ⭐ Capture the date from GET
-    selected_date = request.GET.get("date")
+    # Get date from GET OR fallback = TODAY
+    selected_date = request.GET.get("date") or date.today().isoformat()
 
     context = {
-        'user': request.user,
-        'title': 'PSP',
-        'selected_state': selected_state,
-        'selected_date': selected_date,     # ⭐ send date to template
+        "user": request.user,
+        "title": "PSP",
+        "selected_state": selected_state,
+        "selected_date": selected_date,
+        "today": date.today().isoformat(),   # for template fallback
     }
-    return render(request, 'dailyreports/psp.html', context)
-
+    return render(request, "dailyreports/psp.html", context)
 
 
 @login_required
